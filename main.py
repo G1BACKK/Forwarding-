@@ -1,60 +1,68 @@
-import asyncio
 from pyrogram import Client, filters
-from pyrogram.errors import UserAlreadyParticipant
-import re
+import asyncio
 
-API_ID = 26652570         # change
-API_HASH = "1dcbd158e145479b1599a49259ab84b3" # change
-MASTER_GROUP_LINK = "https://t.me/zhueheu"  # change
+API_ID = 26652570
+API_HASH = "1dcbd158e145479b1599a49259ab84b3"
+STRING_SESSION = "BQFitqsAmpZV9EDZaF6gV3G-TAQjRVHJ0wcfuJG4swz3tQlX2CtRjJnbsUK0ym0z-Zi4eaY-2xoh_Kg2hFkl05GQ8s4QU4TKPEsO96wCaUUCn_1Bn-0ONPp8Xb_I67kathAeCh5skmAATcMv3Ya0SHFVD0O5AuBS9jCQSMjAknF-H3ai5DnxSUhpNnIvLalf_JpWVIm-PGyP7nKwrx39KjeNjiCRZtbiwRRZ0J4eV2hfg_zaUP8Ge289q-yeeBGyC1vtFEWw1gEiMVlJsIv30vr3SnsN0oywtU1qSsxPSFH_bKm_Ee3L5qAadv9ohqWn7vhlBtszUKuPlvf1HtxlY8lls8oLDwAAAAHkJjblAA"
 
-app = Client("forwarder", api_id=API_ID, api_hash=API_HASH)
+MASTER_LINK = "https://t.me/hdjsjenejen"   # Your main group
+TARGET_LINKS = [
+    "https://t.me/GODlevelMAX4444x",
+    "https://t.me/PIZOX_TEAM",
+    "https://t.me/TASHANWINEARNINGS",
+    "https://t.me/udsidhubb",
+    "https://t.me/JALWA_GAME_PREDICTION_GROUP_VIP",
+    # add all your links here...
+]
 
-# Convert group link → username
-def extract_username(link):
-    return link.replace("https://t.me/", "").replace("joinchat/", "").strip()
+app = Client("user", api_id=API_ID, api_hash=API_HASH, session_string=STRING_SESSION)
 
-async def join_groups():
-    print("Joining target groups...")
-    with open("groups.txt", "r") as f:
-        links = f.read().splitlines()
+MASTER_ID = None
+TARGET_IDS = []
 
-    for link in links:
-        if not link.strip():
-            continue
 
-        username = extract_username(link)
+async def convert_links_to_ids():
+    global MASTER_ID, TARGET_IDS
 
+    # Convert master group link → chat ID
+    try:
+        chat = await app.get_chat(MASTER_LINK)
+        MASTER_ID = chat.id
+        print(f"MASTER ID = {MASTER_ID}")
+    except Exception as e:
+        print(f"Master group error: {e}")
+
+    # Convert all target links → chat IDs
+    for link in TARGET_LINKS:
         try:
-            await app.join_chat(username)
-            print(f"Joined: {username}")
-        except UserAlreadyParticipant:
-            print(f"Already in: {username}")
+            chat = await app.get_chat(link)
+            TARGET_IDS.append(chat.id)
+            print(f"{link} → {chat.id}")
         except Exception as e:
-            print(f"Failed to join {username} → {e}")
+            print(f"Error for {link}: {e}")
+
+    print("All group IDs loaded!")
 
 
-@app.on_message(filters.chat(MASTER_GROUP_LINK))
-async def forward(client, message):
-    print("New message in master group. Forwarding...")
-
-    with open("groups.txt", "r") as f:
-        links = f.read().splitlines()
-
-    for link in links:
-        username = extract_username(link)
+@app.on_message(filters.chat(lambda: MASTER_ID))
+async def forwarder(client, message):
+    for group_id in TARGET_IDS:
         try:
-            await message.copy(username)
-            print(f"Sent to {username}")
+            if message.text:
+                await client.send_message(group_id, message.text)
+            elif message.photo:
+                await client.send_photo(group_id, message.photo.file_id, caption=message.caption)
+            elif message.video:
+                await client.send_video(group_id, message.video.file_id, caption=message.caption)
         except Exception as e:
-            print(f"Failed to send to {username} → {e}")
+            print(f"Error sending to {group_id}: {e}")
 
 
 async def main():
-    await join_groups()
-    print("Bot running...")
-    await app.start()
-    await idle()
-    await app.stop()
+    await convert_links_to_ids()
+    print("Forwarder bot started!")
 
-if __name__ == "__main__":
-    app.run()
+
+app.start()
+asyncio.get_event_loop().run_until_complete(main())
+app.run()
